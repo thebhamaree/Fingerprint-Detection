@@ -1,0 +1,86 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.feature import hessian_matrix, hessian_matrix_eigvals
+from skimage.filters import hessian, meijering, sato, frangi
+
+
+image = cv2.imread("./himg.jpg")
+#print('Original Dimensions : ',image.shape) 
+width = 350
+height = 450
+dim = (width, height)
+ # resize image
+resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+ #print('Resized Dimensions : ',resized.shape)
+
+#################################################            background remove                      ######################################
+
+
+
+
+
+height, width = resized.shape[:2]
+#Create a mask holder
+mask = np.zeros(resized.shape[:2],np.uint8)
+#Grab Cut the object
+bgdModel = np.zeros((1,65),np.float64)
+fgdModel = np.zeros((1,65),np.float64)
+#Hard Coding the Rect… The object must lie within this rect.
+rect = (10,10,width-30,height-30)
+cv2.grabCut(resized,mask,rect,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_RECT)
+mask = np.where((mask==2)|(mask==0),0,1).astype("uint8")
+img1 = resized*mask[:,:,np.newaxis]
+#Get the background
+background = cv2.absdiff(resized,img1)
+#Change all pixels in the background that are not black to white
+background[np.where((background > [0,0,0]).all(axis = 2))] = [255,255,255]
+#Add the background and the image
+img2 = background + img1
+
+
+#################################################               sharpen image                 ###############################################
+
+kernel = np.array([[-1,-1,-1], 
+                   [-1, 9,-1],
+                   [-1,-1,-1]])
+img3= cv2.filter2D(img2, -1, kernel)
+#cv2.imshow("sharpened",img3)
+
+
+########################################               grayscale image                #################################################
+
+img4=cv2.cvtColor(img3,cv2.COLOR_BGR2GRAY) 
+
+
+##############################################      histogram equilization ##########################################
+
+
+hist,bins = np.histogram(img4.flatten(),256,[0,256])
+cdf = hist.cumsum()
+cdf_normalized = cdf * hist.max()/ cdf.max()
+cdf_m = np.ma.masked_equal(cdf,0)
+cdf_m = (cdf_m - cdf_m.min())*255/(cdf_m.max()-cdf_m.min())
+cdf = np.ma.filled(cdf_m,0).astype('uint8')
+img5=cdf[img4]
+cv2.imwrite("./gg.png",img5)
+
+
+###########################################              ridge detection filter                       ##########################################
+#hessian_img=hessian(img4)
+#meijering_img=meijering(img4)
+#sato_img=sato(img4)
+#frangi_img=frangi(img4)
+
+
+
+######################################### convert image into binary ##################################################
+
+
+
+
+
+
+#cv2.imshow("binary image",thresh)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
